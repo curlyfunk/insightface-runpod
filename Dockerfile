@@ -1,36 +1,35 @@
-FROM runpod/pytorch:2.0.1-py3.10-cuda11.8.0-devel
+FROM runpod/python:3.10-ubuntu
 
-# Инсталиране на системни зависимости
+# Системни зависимости
 RUN apt-get update && apt-get install -y \
     wget \
     ffmpeg \
     libsm6 \
     libxext6 \
     unzip \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Фикс за setuptools, който причиняваше Build Failed
+# pip инструменти
 RUN pip install --upgrade pip setuptools wheel
 
-# Инсталиране на стабилни Python зависимости
+# PyTorch и CUDA (леки и съвместими)
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# Основни зависимости за InsightFace
 RUN pip install --no-cache-dir \
     opencv-python-headless==4.7.0.72 \
-    scikit-image==0.21.0 \
-    flask==2.3.3 \
-    runpod==1.7.9 \
+    scikit-image \
+    flask \
+    runpod \
     onnxruntime-gpu==1.16.3 \
     insightface==0.7.3 \
-    matplotlib==3.7.3 \
-    scikit-learn==1.3.0 \
-    tqdm==4.66.1 \
-    easydict==1.10 \
-    albumentations==1.3.1
+    tqdm \
+    easydict \
+    albumentations
 
-# Изтегляне на InsightFace без git
-RUN wget https://github.com/deepinsight/insightface/archive/refs/heads/master.zip -O /tmp/insightface.zip && \
-    unzip /tmp/insightface.zip -d /app && \
-    mv /app/insightface-master /app/insightface && \
-    rm /tmp/insightface.zip
+# Изтегляне на InsightFace
+RUN git clone https://github.com/deepinsight/insightface.git /app/insightface
 
 # Изтегляне на моделите
 RUN mkdir -p /app/models && \
