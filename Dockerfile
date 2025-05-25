@@ -7,22 +7,19 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsm6 \
     libxext6 \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Инсталиране на Python пакети
-RUN pip install --no-cache-dir \
-    insightface \
-    onnxruntime-gpu \
-    opencv-python \
-    scikit-image \
-    flask \
-    runpod
+# Инсталиране на Python пакети поотделно, за да избегнем конфликти
+RUN pip install --no-cache-dir opencv-python-headless
+RUN pip install --no-cache-dir scikit-image
+RUN pip install --no-cache-dir flask
+RUN pip install --no-cache-dir runpod
+RUN pip install --no-cache-dir onnxruntime-gpu
+RUN pip install --no-cache-dir insightface
 
 # Клониране на InsightFace хранилището
 RUN git clone https://github.com/deepinsight/insightface.git /app/insightface
-
-# Инсталиране на InsightFace
-RUN pip install -e /app/insightface/python-package
 
 # Изтегляне на предварително обучени модели
 RUN mkdir -p /app/models && \
