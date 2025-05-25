@@ -1,36 +1,85 @@
-FROM runpod/pytorch:2.0.1-py3.10-cuda11.8.0-devel
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
-# Инсталиране на системни зависимости + build инструменти
-RUN apt-get update && apt-get install -y \
-    wget \
-    unzip \
-    ffmpeg \
-    libsm6 \
-    libxext6 \
-    build-essential \
-    cmake \
-    ninja-build \
-    && rm -rf /var/lib/apt/lists/*
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=on \
+    SHELL=/bin/bash
 
-# pip инструменти
-RUN pip install --upgrade pip setuptools wheel
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Python зависимости (фиксирани версии)
-RUN pip install --no-cache-dir \
-    runpod==1.7.9 \
-    insightface==0.7.3 \
-    onnxruntime-gpu==1.16.3 \
-    opencv-python-headless==4.7.0.72 \
-    flask==2.3.3 \
-    tqdm==4.66.1 \
-    easydict==1.10 \
-    scikit-image==0.21.0 \
-    albumentations==1.3.1
+# Upgrade apt packages and install required dependencies
+RUN apt update && \
+    apt upgrade -y && \
+    apt install -y \
+      python3-dev \
+      python3-pip \
+      python3.10-venv \
+      fonts-dejavu-core \
+      rsync \
+      git \
+      git-lfs \
+      jq \
+      moreutils \
+      aria2 \
+      wget \
+      curl \
+      libglib2.0-0 \
+      libsm6 \
+      libgl1 \
+      libxrender1 \
+      libxext6 \
+      ffmpeg \
+      unzip \
+      libgoogle-perftools-dev \
+      procps && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean -y
 
-# Изтегляне на моделите
-RUN mkdir -p /app/models && \
-    wget -O /app/models/buffalo_l.zip https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip && \
-    unzip /app/models/buffalo_l.zip -d /app/models/ && \
-    rm /app/models/buffalo_l.zip
+# Set working directory
+WORKDIR /workspace
 
-# Копиране на handler.py
+# Install Torch
+RUN pip3 install --no-cache-dir torch==2.6.0+cu124 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# Install Inswapper Serverless Worker
+RUN git clone https://github.com/ashleykleynhans/runpod-worker-inswapper.git && \
+    cd /workspace/runpod-worker-inswapper && \
+    pip3 install -r requirements.txt && \
+    pip3 uninstall -y onnxruntime && \
+    pip3 install onnxruntime-gpu
+
+# Download insightface checkpoints
+RUN cd /workspace/runpod-worker-inswapper && \
+    mkdir -p checkpoints/models && \
+    cd checkpoints && \
+    wget -O inswapper_128.onnx "https://huggingface.co/ashleykleynhans/inswapper/resolve/main/inswapper_128.onnx?download=true" && \
+    cd models && \
+    wget https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip && \
+    mkdir buffalo_l && \
+    cd buffalo_l && \
+    unzip ../buffalo_l.zip
+
+# Install CodeFormer
+RUN cd /workspace/runpod-worker-inswapper && \
+    git lfs install && \
+    git clone https://huggingface.co/spaces/sczhou/CodeFormer
+
+# Download CodeFormer weights
+RUN cd /workspace/runpod-worker-inswapper && \
+    mkdir -p CodeFormer/CodeFormer/weights/CodeFormer && \
+    wget -O CodeFormer/CodeFormer/weights/CodeFormer/codeformer.pth "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth" && \
+    mkdir -p CodeFormer/CodeFormer/weights/facelib && \
+    wget -O CodeFormer/CodeFormer/weights/facelib/detection_Resnet50_Final.pth "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/detection_Resnet50_Final.pth" && \
+    wget -O CodeFormer/CodeFormer/weights/facelib/parsing_parsenet.pth "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/parsing_parsenet.pth" && \
+    mkdir -p CodeFormer/CodeFormer/weights/realesrgan && \
+    wget -O CodeFormer/CodeFormer/weights/realesrgan/RealESRGAN_x2plus.pth "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/RealESRGAN_x2plus.pth"
+
+# Copy handler to ensure its the latest
+COPY --chmod=755 handler.py /workspace/runpod-worker-inswapper/handler.py
+
+# Docker container start script
+COPY --chmod=755 start.sh /start.sh
+
+# Start the container
+ENTRYPOINT /start.sh
