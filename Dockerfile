@@ -9,7 +9,10 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Инсталиране на Python зависимости с фиксирани версии (бърз билд)
+# Фикс за setuptools, който причиняваше Build Failed
+RUN pip install --upgrade pip setuptools wheel
+
+# Инсталиране на стабилни Python зависимости
 RUN pip install --no-cache-dir \
     opencv-python-headless==4.7.0.72 \
     scikit-image==0.21.0 \
@@ -23,7 +26,7 @@ RUN pip install --no-cache-dir \
     easydict==1.10 \
     albumentations==1.3.1
 
-# Изтегляне на InsightFace (без git)
+# Изтегляне на InsightFace без git
 RUN wget https://github.com/deepinsight/insightface/archive/refs/heads/master.zip -O /tmp/insightface.zip && \
     unzip /tmp/insightface.zip -d /app && \
     mv /app/insightface-master /app/insightface && \
