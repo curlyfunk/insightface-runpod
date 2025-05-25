@@ -1,37 +1,27 @@
-FROM runpod/python:3.10-ubuntu
+FROM runpod/pytorch:2.0.1-py3.10-cuda11.8.0-devel
 
 # Системни зависимости
 RUN apt-get update && apt-get install -y \
     wget \
+    unzip \
     ffmpeg \
     libsm6 \
     libxext6 \
-    unzip \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
-# pip инструменти
+# pip инструменти – задължително за билда
 RUN pip install --upgrade pip setuptools wheel
 
-# PyTorch и CUDA (леки и съвместими)
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-# Основни зависимости за InsightFace
+# Минимален и стабилен set от зависимости
 RUN pip install --no-cache-dir \
-    opencv-python-headless==4.7.0.72 \
-    scikit-image \
-    flask \
     runpod \
-    onnxruntime-gpu==1.16.3 \
     insightface==0.7.3 \
-    tqdm \
-    easydict \
-    albumentations
+    onnxruntime-gpu==1.16.3 \
+    opencv-python-headless==4.7.0.72 \
+    flask \
+    tqdm
 
-# Изтегляне на InsightFace
-RUN git clone https://github.com/deepinsight/insightface.git /app/insightface
-
-# Изтегляне на моделите
+# Изтегляне на модела
 RUN mkdir -p /app/models && \
     wget -O /app/models/buffalo_l.zip https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip && \
     unzip /app/models/buffalo_l.zip -d /app/models/ && \
@@ -41,5 +31,5 @@ RUN mkdir -p /app/models && \
 COPY handler.py /app/
 WORKDIR /app
 
-# Стартиране
+# Старт
 CMD ["python", "-m", "runpod.serverless.start"]
